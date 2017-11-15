@@ -1,0 +1,79 @@
+<?php
+
+/**
+ * @file
+ * Schema definitions install/update/uninstall hooks.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function feeds_dashboard_schema() {
+  $schema = array();
+
+  $schema['feeds_dashboard'] = array(
+    'description' => 'The table for storing feeds history.',
+    'fields' => array(
+      'did' => array(
+        'description' => 'The primary identifier for a feed import.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'id' => array(
+        'description' => 'The id of the importer that created this import.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+        'not null' => TRUE),
+      'operation_description' => array(
+        'description' => 'Description of the operation.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'default' => ''),
+      'file' => array(
+        'description' => 'File URL.',
+        'type' => 'text',
+        'not null' => TRUE,
+        'default' => ''),
+      'date' => array(
+        'description' => 'Datetime of the import',
+        'type' => 'datetime',
+        'pgsql_type' => 'timestamp',
+        'mysql_type' => 'DATETIME')
+      ),
+    'unique keys' => array(
+      'did' => array('did')
+      ),
+    'primary key' => array('did')
+    );
+
+ $schema['feeds_dashboard_imports'] = array(
+    'description' => 'The table for storing feeds import contents.',
+    'fields' => array(
+      'imid' => array(
+        'description' => 'The primary identifier for a feed import content.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'did' => array(
+        'description' => 'The foreign identifier for a feed import.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE),
+      'content' => array(
+        'description' => 'Entity content.',
+        'type' => 'text',
+        'default' => ''),
+      'entity_id' => array(
+        'description' => 'Entity ID if entity exists, empty if new entity',
+        'type' => 'int')
+      ),
+    'unique keys' => array(
+      'imid' => array('imid')
+      ),
+    'primary key' => array('imid')
+    );
+
+  return $schema;
+}

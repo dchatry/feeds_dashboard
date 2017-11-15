@@ -1,0 +1,111 @@
+<?php
+
+/**
+ * Implements hook_menu().
+ */
+function feeds_dashboard_menu() {
+  $items['import/%feeds_importer/history'] = array(
+    'title' => 'History',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'feeds_dashboard_show_history',
+    'page arguments' => array(1),
+    'access callback' => 'feeds_access',
+    'access arguments' => array('import', 1),
+    'file' => 'feeds_dashboard.pages.inc',
+    'weight' => -9,
+  );
+
+  return $items;
+}
+
+/**
+ * Invoked before a feed source import starts.
+ *
+ * @param FeedsSource $source
+ *  FeedsSource object that describes the source that is going to be imported.
+ */
+function feeds_dashboard_feeds_before_import(FeedsSource $source) {
+  // Create log in database and get dashboard id.
+  $source->did = db_insert('feeds_dashboard')
+    ->fields(array(
+      'operation_description' => 'Started importing.',
+      'id' => $source->id,
+      'file' => '',
+      'date' => date('Y-m-d H:i:s'),
+    ))
+    ->execute();
+  watchdog('feeds_dashboard_history_2', "<pre>" . print_r($source, true) . "</pre>");
+}
+
+/**
+ * Invoked after a feed source has been imported.
+ *
+ * @param FeedsSource $source
+ *  FeedsSource object that describes the source that has been imported.
+ */
+function feeds_dashboard_feeds_after_import(FeedsSource $source) {
+  // Copy the source file to specific folder for history purpose.
+  $file = file_load($source->config['FeedsFileFetcher']['fid']);
+  $destination = drupal_realpath('public://') . '/feeds_dashboard/';
+
+  if (file_prepare_directory($destination, FILE_CREATE_DIRECTORY)) {
+    $destination = file_stream_wrapper_uri_normalize('public://feeds_dashboard/' . drupal_basename($file));
+    $copied_file = file_copy($file, $destination, FILE_EXISTS_RENAME);
+
+    // Log the import.
+    if(!empty($copied_file)) {
+      $results = $source->state['process'];
+      $operation_description = sprintf(t("%d proccessed nodes, %d created, %d updated, %d deleted."), $results->total, $results->created, $results->updated, $results->deleted);
+
+      db_update('feeds_dashboard')
+        ->fields(array(
+          'operation_description' => $operation_description,
+          'file' => $copied_file->uri,
+          'date' => date('Y-m-d H:i:s'),
+        ))
+        ->condition('did', $source->did, '=')
+        ->execute();
+    } else {
+      drupal_set_message(t("Error while copying import file, please check file writing permission to public:// folder"), 'error', FALSE);
+    }
+  } else {
+    drupal_set_message(t("Error while creating import folder, please check file writing permission to public:// folder"), 'error', FALSE);
+  }
+}
+
+
+/**
+ * Invoked after a feed source has been cleared of its items.
+ *
+ * @param FeedsSource $source
+ *  FeedsSource object that describes the source that has been cleared.
+ */
+function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
+  watchdog('feeds_dashboard', "<pre>" . print_r($source, true) . "</pre>");
+}
+
+
+/**
+ * Invoked before a feed item is saved.
+ *
+ * @param FeedsSource $source
+ *   FeedsSource object that describes the source that is being imported.
+ * @param $entity
+ *   The entity object.
+ * @param array $item
+ *   The parser result for this entity.
+ * @param int|null $entity_id
+ *   The id of the current item which is going to be updated. If this is a new
+ *   item, then NULL is passed.
+ */
+function feeds_dashboard_feeds_presave(FeedsSource $source, $entity, $item, $entity_id) {
+  // Log content created.
+  db_insert('feeds_dashboard_imports')
+    ->fields(array(
+      'did' => $source->did,
+      'content' => serialize($item),
+      'entity_id' => $entity_id,
+    ))
+    ->execute();
+}
+
