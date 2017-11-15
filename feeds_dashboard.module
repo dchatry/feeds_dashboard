@@ -34,7 +34,6 @@ function feeds_dashboard_feeds_before_import(FeedsSource $source) {
       'date' => date('Y-m-d H:i:s'),
     ))
     ->execute();
-  watchdog('feeds_dashboard_history_2', "<pre>" . print_r($source, true) . "</pre>");
 }
 
 /**
@@ -55,7 +54,7 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
     // Log the import.
     if(!empty($copied_file)) {
       $results = $source->state['process'];
-      $operation_description = sprintf(t("%d proccessed nodes, %d created, %d updated, %d deleted."), $results->total, $results->created, $results->updated, $results->deleted);
+      $operation_description = t('@processed processed nodes, @created created, @updated updated, @deleted deleted.', array('@processed' => $results->total, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
 
       db_update('feeds_dashboard')
         ->fields(array(
@@ -84,28 +83,83 @@ function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
   watchdog('feeds_dashboard', "<pre>" . print_r($source, true) . "</pre>");
 }
 
-
 /**
- * Invoked before a feed item is saved.
+ * Invoked after a feed item has been saved.
  *
  * @param FeedsSource $source
- *   FeedsSource object that describes the source that is being imported.
+ *  FeedsSource object that describes the source that is being imported.
  * @param $entity
- *   The entity object.
+ *   The entity object that has just been saved.
  * @param array $item
  *   The parser result for this entity.
  * @param int|null $entity_id
- *   The id of the current item which is going to be updated. If this is a new
- *   item, then NULL is passed.
+ *  The id of the current item which is going to be updated. If this is a new
+ *  item, then NULL is passed.
  */
-function feeds_dashboard_feeds_presave(FeedsSource $source, $entity, $item, $entity_id) {
+function feeds_dashboard_feeds_after_save(FeedsSource $source, $entity, $item, $entity_id) {
   // Log content created.
-  db_insert('feeds_dashboard_imports')
+  db_insert('feeds_dashboard_operations')
     ->fields(array(
       'did' => $source->did,
+      'entity' => serialize($entity),
       'content' => serialize($item),
       'entity_id' => $entity_id,
     ))
     ->execute();
 }
 
+
+/**
+ * Implements hook_theme().
+ */
+function feeds_dashboard_theme() {
+  $theme_subfolder = drupal_get_path('module', 'feeds_dashboard') . '/theme';
+  $items['feeds_dashboard_history_page'] = array(
+    'variables' => array('operations' => array()),
+    'path' => $theme_subfolder,
+    'template' => 'feeds-dashboard--history',
+  );
+  $items['feeds_dashboard_details'] = array(
+    'variables' => array('data' => array()),
+    'path' => $theme_subfolder,
+    'template' => 'feeds-dashboard--table',
+  );
+
+  return $items;
+}
+
+
+/**
+ * Returns an array of operations given a feed id.
+ *
+ * @param string $id
+ *   Id of the feed configuration.
+ */
+function feeds_dashboard_get_operations_for_feed($id) {
+  $operations = db_select('feeds_dashboard', 'fd')
+    ->fields('fd')
+    ->condition('id', $id, '=')
+    ->orderBy('date', 'DESC')
+    ->execute()
+    ->fetchAllAssoc('did');
+
+  return $operations;
+}
+
+/**
+ * Returns an array of imported content
+ * given an import id.
+ *
+ * @param string $did
+ *   Id of the import.
+ */
+function feeds_dashboard_get_data_for_operation($did) {
+  $data = db_select('feeds_dashboard_operations', 'fdi')
+    ->fields('fdi')
+    ->condition('did', $did, '=')
+    ->orderBy('imid', 'ASC')
+    ->execute()
+    ->fetchAllAssoc('imid');
+
+  return $data;
+}

@@ -48,21 +48,25 @@ function feeds_dashboard_schema() {
     'primary key' => array('did')
     );
 
- $schema['feeds_dashboard_imports'] = array(
-    'description' => 'The table for storing feeds import contents.',
+ $schema['feeds_dashboard_operations'] = array(
+    'description' => 'The table for storing feeds operation contents.',
     'fields' => array(
       'imid' => array(
-        'description' => 'The primary identifier for a feed import content.',
+        'description' => 'The primary identifier for a feed operation content.',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE),
       'did' => array(
-        'description' => 'The foreign identifier for a feed import.',
+        'description' => 'The foreign identifier for a feed operation.',
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE),
+      'entity' => array(
+        'description' => 'Entity serialized content.',
+        'type' => 'text',
+        'default' => ''),
       'content' => array(
-        'description' => 'Entity content.',
+        'description' => 'Parsed, serialized content.',
         'type' => 'text',
         'default' => ''),
       'entity_id' => array(
