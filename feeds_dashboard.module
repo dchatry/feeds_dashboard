@@ -14,6 +14,24 @@ function feeds_dashboard_menu() {
     'file' => 'feeds_dashboard.pages.inc',
     'weight' => -9,
   );
+  $items['import/%feeds_importer/history/operation/%'] = array(
+    'title' => 'Operation',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'feeds_dashboard_show_operation',
+    'page arguments' => array(1,4),
+    'access callback' => 'feeds_access',
+    'access arguments' => array('import', 1),
+    'file' => 'feeds_dashboard.pages.inc',
+  );
+  $items['import/%feeds_importer/history/operation/%/%'] = array(
+    'title' => 'Operation content',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'feeds_dashboard_show_operation_content',
+    'page arguments' => array(1,4,5),
+    'access callback' => 'feeds_access',
+    'access arguments' => array('import', 1),
+    'file' => 'feeds_dashboard.pages.inc',
+  );
 
   return $items;
 }
@@ -54,7 +72,7 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
     // Log the import.
     if(!empty($copied_file)) {
       $results = $source->state['process'];
-      $operation_description = t('@processed processed nodes, @created created, @updated updated, @deleted deleted.', array('@processed' => $results->total, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
+      $operation_description = t('@skipped skipped, @created created, @updated updated, @deleted deleted.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
 
       db_update('feeds_dashboard')
         ->fields(array(
@@ -81,6 +99,17 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
  */
 function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
   watchdog('feeds_dashboard', "<pre>" . print_r($source, true) . "</pre>");
+  // Log feed deletion.
+  $results = $source->state['process_clear'];
+  $operation_description = t('<span class="fd-content-clear">Feed content clear</span>: @skipped skipped, @created created, @updated updated, @deleted deleted.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
+
+  db_insert('feeds_dashboard')
+    ->fields(array(
+      'id' => $source->id,
+      'operation_description' => $operation_description,
+      'date' => date('Y-m-d H:i:s'),
+    ))
+    ->execute();
 }
 
 /**
@@ -107,7 +136,6 @@ function feeds_dashboard_feeds_after_save(FeedsSource $source, $entity, $item, $
     ))
     ->execute();
 }
-
 
 /**
  * Implements hook_theme().
@@ -147,15 +175,47 @@ function feeds_dashboard_get_operations_for_feed($id) {
 }
 
 /**
+ * Returns an operation given an operation id.
+ *
+ * @param int $did
+ *   operation id.
+ */
+function feeds_dashboard_get_operation($did) {
+  $operation = db_select('feeds_dashboard', 'fd')
+    ->fields('fd')
+    ->condition('did', $did, '=')
+    ->execute()
+    ->fetchAllAssoc('did');
+
+  return $operation;
+}
+
+/**
+ * Returns import data given an import id.
+ *
+ * @param int $imid
+ *   import id.
+ */
+function feeds_dashboard_get_imported_data($imid) {
+  $data = db_select('feeds_dashboard_operations', 'fdo')
+    ->fields('fdo')
+    ->condition('imid', $imid, '=')
+    ->execute()
+    ->fetchAssoc();
+
+  return $data;
+}
+
+/**
  * Returns an array of imported content
- * given an import id.
+ * given an operation id.
  *
  * @param string $did
- *   Id of the import.
+ *   Id of the operation.
  */
 function feeds_dashboard_get_data_for_operation($did) {
-  $data = db_select('feeds_dashboard_operations', 'fdi')
-    ->fields('fdi')
+  $data = db_select('feeds_dashboard_operations', 'fdo')
+    ->fields('fdo')
     ->condition('did', $did, '=')
     ->orderBy('imid', 'ASC')
     ->execute()

@@ -14,20 +14,24 @@
     <div class="fieldset-wrapper"><?php print t('@count proccessed operation(s)', array('@count' => count($variables['operations']))); ?></div>
   </fieldset>
   <?php foreach ($variables['operations'] as $did => $operation): ?>
-    <fieldset>
+    <fieldset class="<?php print (empty($operation->file)) ? 'fd-content-clear' : ''; ?>">
       <legend><span class="fieldset-legend"><?php print t("On ") . $operation->date; ?></span></legend>
       <div class="fd-operation fd-operation-$did fieldset-wrapper">
-        <div class="fd-operation-file">
-          <label><?php print t("From file:"); ?></label>
-          <?php print l(drupal_basename($operation->file), file_create_url($operation->file)); ?>      
-        </div>
+        <?php if(!empty($operation->file)): ?>
+          <div class="fd-operation-file">
+            <label><?php print t("From file:"); ?></label>
+            <?php print l(drupal_basename($operation->file), file_create_url($operation->file)); ?>      
+          </div>
+        <?php endif; ?>
         <div class="fd-operation-summary">
           <label><?php print t("Summary:"); ?></label>
           <?php print $operation->operation_description; ?>      
         </div>
-        <div class="fd-operation-details">
-          <?php print feeds_dashboard_show_details($operation->did); ?>      
-        </div>
+        <?php if(!empty($operation->file)): ?>
+          <div class="fd-operation-details">
+            <?php print feeds_dashboard_show_details($operation->did); ?>      
+          </div>
+        <?php endif; ?>
       </div>
     </fieldset>
   <?php endforeach; ?>

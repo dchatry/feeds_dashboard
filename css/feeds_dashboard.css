@@ -1,0 +1,25 @@
+.fd-title {
+  width: 15%;
+}
+
+.fd-created {
+  color: green;
+  font-weight: bold;
+}
+
+.fd-updated {
+  color: blue;
+  font-weight: bold;
+}
+
+.fd-content-clear {
+  border-color: red;
+  background: pink;
+}
+
+.fd-alert {
+  text-align: center;
+  padding: 10px;
+  border: 1px solid #e0c89c;
+  background: #ffc;
+}
