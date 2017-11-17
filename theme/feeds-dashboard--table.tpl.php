@@ -10,18 +10,25 @@
 ?>
 
 <?php 
+  $enable_rollback = TRUE;
   foreach ($variables['data'] as $imid => $data) {
     $entity = unserialize($data->entity);
     if ($entity->revision === FALSE) {
-      print "<div class='fd-alert'>" . t("At least one entity has its revision setting disabled, some functionalities such as revision comparison and rollback might not work and may result in a loss of data. Make sure to enable \"Create a new revision\" on the content type settings page.") . "</div>";
+      print "<div class='fd-alert'>" . t("At least one entity has its revision setting disabled, some functionalities such as revision comparison might not work and rollback has been disabled as it may result in a loss of data. Make sure to enable \"Create a new revision\" on the content type settings page.") . "</div>";
+      $enable_rollback = FALSE;
       break;
     }
+  }
+
+  if($enable_rollback === TRUE) {
+    print l('&#8617; Revert data to previous state (delete if no previous state)', 'import/' . arg(1) . '/history/operation/' . $data->did . '/revert', array('attributes' => array('class' => 'fd-rollback-link'), 'html' => TRUE));
   }
 ?>
 <table>
   <thead>
     <tr>
       <th>Entity</th>
+      <th>Current</th>
       <th>Operation</th>
       <th>Source data</th>
       <th>Snapshot data</th>
@@ -31,7 +38,7 @@
   </thead>
   <tbody>
     <?php foreach ($variables['data'] as $imid => $data): ?>
-      <?php $entity = unserialize($data->entity); ?>
+      <?php $entity = unserialize($data->entity); $entity_info = node_load($entity->nid); ?>
       <tr>
         <td class="fd-title">
           <?php
@@ -39,18 +46,34 @@
           ?>
         </td>
         <td>
+          <?php if($entity_info->status == 1): ?>
+            <?php print t("Current"); ?>
+          <?php endif; ?>
+        </td>
+        <td>
           <?php
-            if($entity->feeds_item->is_new === TRUE) {
+            if($data->entity_id == 0) {
               print "<span class='fd-created'>" . t("Created") . "</span>";
-            } else {
+            }
+            elseif($data->entity_id > 0) {
               print "<span class='fd-updated'>" . t("Updated") . "</span>";
+            }
+            elseif($data->entity_id == -1) {
+              print "<span class='fd-deleted'>" . t("Deleted") . "</span>";
+            }
+            elseif($data->entity_id == -2) {
+              print "<span class='fd-error'>" . t("Error deleting") . "</span>";
             }
           ?>
         </td>
         <td><?php print l('Source data', 'import/' . arg(1) . '/history/operation/' . $data->did . '/' . $data->imid); ?></td>
         <td><?php print l('Snapshot data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/' . $entity->vid . '/view'); ?></td>
         <td><?php print l('Current data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id); ?></td>
-        <td><?php print l('Compare', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/view/' . $entity->old_vid . '/' . $entity->vid); ?></td>
+        <?php if(isset($entity->old_vid)): ?>
+          <td><?php print l('Compare', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/view/' . $entity->old_vid . '/' . $entity->vid); ?></td>
+        <?php else: ?>
+          <td><?php print t('No revision to compare'); ?></td>
+        <?php endif; ?>
       </tr>
     <?php endforeach; ?>
   </tbody>

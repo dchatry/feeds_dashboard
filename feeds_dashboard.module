@@ -23,6 +23,14 @@ function feeds_dashboard_menu() {
     'access arguments' => array('import', 1),
     'file' => 'feeds_dashboard.pages.inc',
   );
+  $items['import/%feeds_importer/history/operation/%/revert'] = array(
+    'title' => 'Operation',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'feeds_dashboard_revert_operation',
+    'page arguments' => array(1,4),
+    'access callback' => 'feeds_access',
+    'access arguments' => array('import', 1)
+  );
   $items['import/%feeds_importer/history/operation/%/%'] = array(
     'title' => 'Operation content',
     'type' => MENU_CALLBACK,
@@ -98,7 +106,6 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
  *  FeedsSource object that describes the source that has been cleared.
  */
 function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
-  watchdog('feeds_dashboard', "<pre>" . print_r($source, true) . "</pre>");
   // Log feed deletion.
   $results = $source->state['process_clear'];
   $operation_description = t('<span class="fd-content-clear">Feed content clear</span>: @skipped skipped, @created created, @updated updated, @deleted deleted.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
@@ -222,4 +229,104 @@ function feeds_dashboard_get_data_for_operation($did) {
     ->fetchAllAssoc('imid');
 
   return $data;
+}
+
+/**
+ * Deletes revisions for a specific operation
+ * given an operation id.
+ *
+ * @param FeedsImporter $feed
+ *   Feed configuration.
+ * @param string $did
+ *   Id of the operation.
+ * @param bool $confirm
+ *   Used to display confirmation page, if $confirm is
+ *   TRUE, the revert will be launched.
+ */
+function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $confirm = '') {
+  $data = feeds_dashboard_get_data_for_operation($did);
+
+  if(!empty($data)) {
+    // Confirm screen.
+    $output = t("The following revisions are about to be deleted:");
+    $list = array();
+
+    // Display revisions which are about to be deleted.
+    foreach ($data as $imid => $row) {
+      $entity = unserialize($row->entity);
+      $list['items'][] = l($entity->title, $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/' . $entity->vid . '/view');
+    }
+
+    $output .= theme('item_list', $list);
+    $output .= l(t("Confirm"), current_path() . "/confirm", array('attributes' => array('class' => 'button')));
+
+    if($confirm === '') {
+      return $output;
+    }
+    if($confirm === 'confirm') {
+      $success = $error = 0;
+      // Delete latest revision.
+      foreach ($data as $imid => $row) {
+        $entity = unserialize($row->entity);
+        $status = feeds_dashboard_node_revision_revert($entity);
+
+        // Update operation table with status.
+        if($status !== FALSE) {
+          db_update('feeds_dashboard_operations')
+            ->fields(array(
+              'entity_id' => -1,
+            ))
+            ->condition('did', $did, '=')
+            ->execute();
+          $success += 1;
+        } else {
+          db_update('feeds_dashboard_operations')
+            ->fields(array(
+              'entity_id' => -2,
+            ))
+            ->condition('did', $did, '=')
+            ->execute();
+          $error += 1;
+        }
+      }
+
+      if($error > 0) {
+        drupal_set_message(t("@success revisions were successfully deleted, @error revisions couldn't be deleted", array('@success' => $success, '@error' => $error)), 'warning', FALSE);
+      } else {
+        drupal_set_message(t("@success revisions were successfully deleted.", array('@success' => $success, '@error' => $error)), 'status', FALSE);
+      }
+
+      // Go back to dashboard.
+      drupal_goto('import/' . arg(1) . '/history');
+    }
+  }
+  return t("No data for this operation.");
+}
+
+
+/**
+ * Revert a node to previous revision.
+ *
+ * @param Entity $entity
+ *   Entity object to revert.
+ */
+function feeds_dashboard_node_revision_revert(&$entity) {
+  if($entity->feeds_item->entity_type == 'node') {
+    $revision_list = node_revision_list($entity);
+    unset($revision_list[$entity->vid]);
+    if (count($revision_list) > 0) {
+      $last_revision = max(array_keys($revision_list));
+      $entity = entity_revision_load('node', $last_revision);
+      $entity->revision = TRUE;
+      $entity->log = "Reverted via revert feed.";
+      entity_save('node', $entity);
+
+      return node_revision_delete($last_revision);
+    } else {
+      return entity_delete('node', $entity->nid);
+    }
+  } else {
+    drupal_set_message(t("Couldn't revert, some entities are not nodes."), 'error', FALSE);
+  }
+  return FALSE;
 }

@@ -12,6 +12,16 @@
   font-weight: bold;
 }
 
+.fd-deleted {
+  color: red;
+  font-weight: bold;
+}
+
+.fd-error {
+  color: orange;
+  font-weight: bold;
+}
+
 .fd-content-clear {
   border-color: red;
   background: pink;
@@ -22,4 +32,10 @@
   padding: 10px;
   border: 1px solid #e0c89c;
   background: #ffc;
+}
+
+.fd-rollback-link {
+  float: right;
+  padding: 10px;
+  font-weight: bold;
 }
