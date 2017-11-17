@@ -9,7 +9,7 @@
  */
 ?>
 
-<?php 
+<?php
   $enable_rollback = TRUE;
   foreach ($variables['data'] as $imid => $data) {
     $entity = unserialize($data->entity);
@@ -46,13 +46,13 @@
           ?>
         </td>
         <td>
-          <?php if($entity_info->status == 1): ?>
+          <?php if($entity_info->vid == $entity->vid && $data->entity_id != -1): ?>
             <?php print t("Current"); ?>
           <?php endif; ?>
         </td>
         <td>
           <?php
-            if($data->entity_id == 0) {
+            if($entity->changed == $entity_info->created && $data->entity_id != -1) {
               print "<span class='fd-created'>" . t("Created") . "</span>";
             }
             elseif($data->entity_id > 0) {
@@ -61,15 +61,20 @@
             elseif($data->entity_id == -1) {
               print "<span class='fd-deleted'>" . t("Deleted") . "</span>";
             }
-            elseif($data->entity_id == -2) {
-              print "<span class='fd-error'>" . t("Error deleting") . "</span>";
-            }
           ?>
         </td>
         <td><?php print l('Source data', 'import/' . arg(1) . '/history/operation/' . $data->did . '/' . $data->imid); ?></td>
-        <td><?php print l('Snapshot data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/' . $entity->vid . '/view'); ?></td>
-        <td><?php print l('Current data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id); ?></td>
-        <?php if(isset($entity->old_vid)): ?>
+        <?php if($data->entity_id != -1): ?>
+          <td><?php print l('Snapshot data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/' . $entity->vid . '/view'); ?></td>
+        <?php else: ?>
+          <td><?php print t('Deleted content'); ?></td>
+        <?php endif; ?>
+        <?php if($data->entity_id != -1): ?>
+          <td><?php print l('Current data', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id); ?></td>
+        <?php else: ?>
+          <td><?php print t('Deleted content'); ?></td>
+        <?php endif; ?>
+        <?php if(isset($entity->old_vid) && $data->entity_id != -1): ?>
           <td><?php print l('Compare', $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id . '/revisions/view/' . $entity->old_vid . '/' . $entity->vid); ?></td>
         <?php else: ?>
           <td><?php print t('No revision to compare'); ?></td>

@@ -11,7 +11,7 @@
 <div class="feeds-dashboard">
   <fieldset>
     <legend><span class="fieldset-legend"><?php print t("History"); ?></span></legend>
-    <div class="fieldset-wrapper"><?php print t('@count proccessed operation(s)', array('@count' => count($variables['operations']))); ?></div>
+    <div class="fieldset-wrapper"><?php print t('@count processed operation(s)', array('@count' => count($variables['operations']))); ?></div>
   </fieldset>
   <?php foreach ($variables['operations'] as $did => $operation): ?>
     <fieldset class="<?php print (empty($operation->file)) ? 'fd-content-clear' : ''; ?>">

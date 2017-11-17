@@ -120,6 +120,18 @@ function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
 }
 
 /**
+ * Implements hook_node_delete().
+ */
+function feeds_dashboard_node_delete($node) {
+  db_update('feeds_dashboard_operations')
+    ->fields(array(
+      'entity_id' => -1, // -1 is deleted.
+    ))
+    ->condition('entity_id', $node->nid, '=')
+    ->execute();
+}
+
+/**
  * Invoked after a feed item has been saved.
  *
  * @param FeedsSource $source
@@ -133,13 +145,13 @@ function feeds_dashboard_feeds_after_clear(FeedsSource $source) {
  *  item, then NULL is passed.
  */
 function feeds_dashboard_feeds_after_save(FeedsSource $source, $entity, $item, $entity_id) {
-  // Log content created.
+  // Log created content.
   db_insert('feeds_dashboard_operations')
     ->fields(array(
       'did' => $source->did,
       'entity' => serialize($entity),
       'content' => serialize($item),
-      'entity_id' => $entity_id,
+      'entity_id' => $entity->nid,
     ))
     ->execute();
 }
@@ -274,19 +286,11 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
         if($status !== FALSE) {
           db_update('feeds_dashboard_operations')
             ->fields(array(
-              'entity_id' => -1,
+              'entity_id' => -1, // -1 is deleted.
             ))
             ->condition('did', $did, '=')
             ->execute();
           $success += 1;
-        } else {
-          db_update('feeds_dashboard_operations')
-            ->fields(array(
-              'entity_id' => -2,
-            ))
-            ->condition('did', $did, '=')
-            ->execute();
-          $error += 1;
         }
       }
 
@@ -312,18 +316,48 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
  */
 function feeds_dashboard_node_revision_revert(&$entity) {
   if($entity->feeds_item->entity_type == 'node') {
-    $revision_list = node_revision_list($entity);
-    unset($revision_list[$entity->vid]);
-    if (count($revision_list) > 0) {
-      $last_revision = max(array_keys($revision_list));
-      $entity = entity_revision_load('node', $last_revision);
-      $entity->revision = TRUE;
-      $entity->log = "Reverted via revert feed.";
-      entity_save('node', $entity);
-
-      return node_revision_delete($last_revision);
+    // Try to delete revision, node_revision_delete()
+    // will return FALSE if revision is current.
+    if (node_revision_delete($old_vid) !== FALSE) {
+      return TRUE;
     } else {
-      return entity_delete('node', $entity->nid);
+      // If we can't delete the revision, we have
+      // to find the second most recent revision
+      // and duplicate it into our new on in order 
+      // to revert to it.
+      $revision_list = node_revision_list($entity);
+      $old_vid = $entity->vid;
+      unset($revision_list[$entity->vid]);
+
+      // If multiple revisions revert to last.
+      if (count($revision_list) > 0) {
+        $last_revision = max(array_keys($revision_list));
+        $entity = entity_revision_load('node', $last_revision);
+        $entity->log = "Reverted via revert feed.";
+        $saved = entity_save('node', $entity);
+
+        // Invalidate hash.
+        db_update('feeds_item')
+          ->fields(array(
+            'hash' => 'invalidated'
+          ))
+          ->condition('entity_id', $entity->nid)
+          ->execute();
+
+        if($saved !== FALSE) {
+          // Delete previous revision now that 
+          // we have saved the new one.
+          if(node_revision_delete($old_vid) !== FALSE) {
+            return TRUE;
+          } else {
+            return FALSE;
+          }
+        } else {
+          return FALSE;
+        }
+      } else {
+        return entity_delete('node', $entity->nid);
+      }
     }
   } else {
     drupal_set_message(t("Couldn't revert, some entities are not nodes."), 'error', FALSE);
