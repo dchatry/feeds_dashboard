@@ -69,6 +69,11 @@ function feeds_dashboard_schema() {
         'description' => 'Parsed, serialized content.',
         'type' => 'text',
         'default' => ''),
+      'state' => array(
+        'description' => 'Created, updated or deleted.',
+        'type' => 'varchar',
+        'length' => 64,
+        'default' => ''),
       'entity_id' => array(
         'description' => 'Entity ID if entity exists, empty if new entity',
         'type' => 'int')

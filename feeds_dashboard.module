@@ -60,6 +60,11 @@ function feeds_dashboard_feeds_before_import(FeedsSource $source) {
       'date' => date('Y-m-d H:i:s'),
     ))
     ->execute();
+
+  // Set variable using $source_id
+  // since there can only be one
+  // import at a time.
+  variable_set($source->id, $source->did);
 }
 
 /**
@@ -69,6 +74,9 @@ function feeds_dashboard_feeds_before_import(FeedsSource $source) {
  *  FeedsSource object that describes the source that has been imported.
  */
 function feeds_dashboard_feeds_after_import(FeedsSource $source) {
+  // Delete temp variable.
+  $did = variable_get($source->id);
+
   // Copy the source file to specific folder for history purpose.
   $file = file_load($source->config['FeedsFileFetcher']['fid']);
   $destination = drupal_realpath('public://') . '/feeds_dashboard/';
@@ -88,7 +96,7 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
           'file' => $copied_file->uri,
           'date' => date('Y-m-d H:i:s'),
         ))
-        ->condition('did', $source->did, '=')
+        ->condition('did', $did, '=')
         ->execute();
     } else {
       drupal_set_message(t("Error while copying import file, please check file writing permission to public:// folder"), 'error', FALSE);
@@ -96,6 +104,9 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
   } else {
     drupal_set_message(t("Error while creating import folder, please check file writing permission to public:// folder"), 'error', FALSE);
   }
+
+  // Delete temp variable.
+  variable_del($source->id);
 }
 
 
@@ -126,6 +137,7 @@ function feeds_dashboard_node_delete($node) {
   db_update('feeds_dashboard_operations')
     ->fields(array(
       'entity_id' => -1, // -1 is deleted.
+      'state' => 'deleted'
     ))
     ->condition('entity_id', $node->nid, '=')
     ->execute();
@@ -145,12 +157,21 @@ function feeds_dashboard_node_delete($node) {
  *  item, then NULL is passed.
  */
 function feeds_dashboard_feeds_after_save(FeedsSource $source, $entity, $item, $entity_id) {
+  $did = variable_get($source->id);
+
+  // State of content.
+  $state = 'created';
+  if($entity->feeds_item->is_new === FALSE) {
+    $state = 'updated';
+  }
+  
   // Log created content.
   db_insert('feeds_dashboard_operations')
     ->fields(array(
-      'did' => $source->did,
+      'did' => $did,
       'entity' => serialize($entity),
       'content' => serialize($item),
+      'state' => $state,
       'entity_id' => $entity->nid,
     ))
     ->execute();
@@ -280,13 +301,13 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
       // Delete latest revision.
       foreach ($data as $imid => $row) {
         $entity = unserialize($row->entity);
-        $status = feeds_dashboard_node_revision_revert($entity);
+        $state = feeds_dashboard_node_revision_revert($entity);
 
-        // Update operation table with status.
-        if($status !== FALSE) {
+        // Update operation table with state.
+        if($state !== FALSE) {
           db_update('feeds_dashboard_operations')
             ->fields(array(
-              'entity_id' => -1, // -1 is deleted.
+              'state' => 'deleted'
             ))
             ->condition('did', $did, '=')
             ->execute();

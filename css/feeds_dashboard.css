@@ -39,3 +39,9 @@
   padding: 10px;
   font-weight: bold;
 }
+
+.fd-see-more-data {
+  text-align: center;
+  font-weight: bold;
+  background: #ddd;
+}

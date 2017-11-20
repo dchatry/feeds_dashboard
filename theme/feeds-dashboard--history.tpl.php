@@ -20,16 +20,16 @@
         <?php if(!empty($operation->file)): ?>
           <div class="fd-operation-file">
             <label><?php print t("From file:"); ?></label>
-            <?php print l(drupal_basename($operation->file), file_create_url($operation->file)); ?>      
+            <?php print l(drupal_basename($operation->file), file_create_url($operation->file)); ?>
           </div>
         <?php endif; ?>
         <div class="fd-operation-summary">
           <label><?php print t("Summary:"); ?></label>
-          <?php print $operation->operation_description; ?>      
+          <?php print $operation->operation_description; ?>
         </div>
         <?php if(!empty($operation->file)): ?>
           <div class="fd-operation-details">
-            <?php print feeds_dashboard_show_details($operation->did); ?>      
+            <?php print feeds_dashboard_show_details($operation->did); ?>
           </div>
         <?php endif; ?>
       </div>
