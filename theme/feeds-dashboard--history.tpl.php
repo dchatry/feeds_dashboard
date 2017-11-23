@@ -19,7 +19,7 @@
       <div class="fd-operation fd-operation-$did fieldset-wrapper">
         <?php if(!empty($operation->file)): ?>
           <div class="fd-operation-file">
-            <label><?php print t("From file:"); ?></label>
+            <label><?php print t("From source:"); ?></label>
             <?php print l(drupal_basename($operation->file), file_create_url($operation->file)); ?>
           </div>
         <?php endif; ?>

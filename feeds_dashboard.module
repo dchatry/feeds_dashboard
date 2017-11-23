@@ -54,7 +54,7 @@ function feeds_dashboard_feeds_before_import(FeedsSource $source) {
   // Create log in database and get dashboard id.
   $source->did = db_insert('feeds_dashboard')
     ->fields(array(
-      'operation_description' => 'Started importing.',
+      'operation_description' => 'Started importing but the import failed (may be locked).',
       'id' => $source->id,
       'file' => '',
       'date' => date('Y-m-d H:i:s'),
@@ -78,32 +78,37 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
   $did = variable_get($source->id);
 
   // Copy the source file to specific folder for history purpose.
-  $file = file_load($source->config['FeedsFileFetcher']['fid']);
-  $destination = drupal_realpath('public://') . '/feeds_dashboard/';
+  if (isset($source->config['FeedsFileFetcher']['fid'])) {
+    $file = file_load($source->config['FeedsFileFetcher']['fid']);
+    $destination = drupal_realpath('public://') . '/feeds_dashboard/';
 
-  if (file_prepare_directory($destination, FILE_CREATE_DIRECTORY)) {
-    $destination = file_stream_wrapper_uri_normalize('public://feeds_dashboard/' . drupal_basename($file));
-    $copied_file = file_copy($file, $destination, FILE_EXISTS_RENAME);
-
-    // Log the import.
-    if(!empty($copied_file)) {
-      $results = $source->state['process'];
-      $operation_description = t('@skipped skipped, @created created, @updated updated, @deleted deleted.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted));
-
-      db_update('feeds_dashboard')
-        ->fields(array(
-          'operation_description' => $operation_description,
-          'file' => $copied_file->uri,
-          'date' => date('Y-m-d H:i:s'),
-        ))
-        ->condition('did', $did, '=')
-        ->execute();
+    if (file_prepare_directory($destination, FILE_CREATE_DIRECTORY)) {
+      $destination = file_stream_wrapper_uri_normalize('public://feeds_dashboard/' . drupal_basename($file));
+      $copied_file = file_copy($file, $destination, FILE_EXISTS_RENAME);
+      $source_uri = $copied_file->uri;
     } else {
-      drupal_set_message(t("Error while copying import file, please check file writing permission to public:// folder"), 'error', FALSE);
+      drupal_set_message(t("Error while creating import folder, please check file writing permission to public:// folder"), 'error', FALSE);
     }
+  } elseif (isset($source->config['FeedsOAIHTTPFetcher']['source'])) {
+    $source_uri = $source->config['FeedsOAIHTTPFetcher']['source'];
+  } elseif (isset($source->config['FeedsHTTPFetcher']['source'])) {
+    $source_uri = $source->config['FeedsHTTPFetcher']['source'];
   } else {
-    drupal_set_message(t("Error while creating import folder, please check file writing permission to public:// folder"), 'error', FALSE);
+    $source_uri = t("No source found.");
   }
+
+  // Log results.
+  $results = $source->state['process'];
+  $operation_description = t('@skipped skipped, @created created, @updated updated, @deleted deleted, @failed failed., @blocked blocked.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted, '@failed' => $results->failed, '@blocked' => $results->blocked));
+
+  db_update('feeds_dashboard')
+    ->fields(array(
+      'operation_description' => $operation_description,
+      'file' => $source_uri,
+      'date' => date('Y-m-d H:i:s'),
+    ))
+    ->condition('did', $did, '=')
+    ->execute();
 
   // Delete temp variable.
   variable_del($source->id);
@@ -279,7 +284,7 @@ function feeds_dashboard_get_data_for_operation($did) {
 function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $confirm = '') {
   $data = feeds_dashboard_get_data_for_operation($did);
 
-  if(!empty($data)) {
+  if (!empty($data)) {
     // Confirm screen.
     $output = t("The following revisions are about to be deleted:");
     $list = array();
@@ -293,10 +298,10 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
     $output .= theme('item_list', $list);
     $output .= l(t("Confirm"), current_path() . "/confirm", array('attributes' => array('class' => 'button')));
 
-    if($confirm === '') {
+    if ($confirm === '') {
       return $output;
     }
-    if($confirm === 'confirm') {
+    if ($confirm === 'confirm') {
       $success = $error = 0;
       // Delete latest revision.
       foreach ($data as $imid => $row) {
@@ -315,7 +320,7 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
         }
       }
 
-      if($error > 0) {
+      if ($error > 0) {
         drupal_set_message(t("@success revisions were successfully deleted, @error revisions couldn't be deleted", array('@success' => $success, '@error' => $error)), 'warning', FALSE);
       } else {
         drupal_set_message(t("@success revisions were successfully deleted.", array('@success' => $success, '@error' => $error)), 'status', FALSE);
@@ -365,7 +370,7 @@ function feeds_dashboard_node_revision_revert(&$entity) {
           ->condition('entity_id', $entity->nid)
           ->execute();
 
-        if($saved !== FALSE) {
+        if ($saved !== FALSE) {
           // Delete previous revision now that 
           // we have saved the new one.
           if(node_revision_delete($old_vid) !== FALSE) {

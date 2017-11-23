@@ -28,6 +28,7 @@
   <thead>
     <tr>
       <th>Entity</th>
+      <th>GUID</th>
       <th>Current</th>
       <th>Operation</th>
       <th>Source data</th>
@@ -44,6 +45,11 @@
         <td class="fd-title">
           <?php
             print l($entity->title, $entity->feeds_item->entity_type . '/' . $entity->feeds_item->entity_id);
+          ?>
+        </td>
+        <td>
+          <?php
+            print $entity->feeds_item->guid;
           ?>
         </td>
         <td>
@@ -75,7 +81,7 @@
         $limit++;
         // Limit displayed rows on history page.
         if($limit >= 10 && !arg(4)) {
-          print "<tr><td class='fd-see-more-data' colspan=7>" . l('See all data', 'import/' . arg(1) . '/history/operation/' . $data->did) . "</td></tr>";
+          print "<tr><td class='fd-see-more-data' colspan=8>" . l('See all data', 'import/' . arg(1) . '/history/operation/' . $data->did) . "</td></tr>";
           break;
         }
       ?>
