@@ -99,7 +99,7 @@ function feeds_dashboard_feeds_after_import(FeedsSource $source) {
 
   // Log results.
   $results = $source->state['process'];
-  $operation_description = t('@skipped skipped, @created created, @updated updated, @deleted deleted, @failed failed., @blocked blocked.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted, '@failed' => $results->failed, '@blocked' => $results->blocked));
+  $operation_description = t('@skipped skipped, @created created, @updated updated, @deleted deleted, @failed failed, @blocked blocked.', array('@skipped' => $results->skipped, '@created' => $results->created, '@updated' => $results->updated, '@deleted' => $results->deleted, '@failed' => $results->failed, '@blocked' => $results->blocked));
 
   db_update('feeds_dashboard')
     ->fields(array(
