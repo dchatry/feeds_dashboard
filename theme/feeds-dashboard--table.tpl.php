@@ -53,7 +53,7 @@
           ?>
         </td>
         <td>
-          <?php if($entity_info->vid == $entity->vid && $data->state != 'deleted'): ?>
+          <?php if($entity_info && $entity_info->vid == $entity->vid && $data->state != 'deleted'): ?>
             <?php print t("Current"); ?>
           <?php endif; ?>
         </td>
