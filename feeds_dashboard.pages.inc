@@ -12,6 +12,7 @@ function feeds_dashboard_show_history(FeedsImporter $feed_importer) {
   if(!empty($operations)) {
     return theme('feeds_dashboard_history_page', array('operations' => $operations));
   }
+
   return t("No operations found for this feed.");
 }
 
@@ -29,6 +30,7 @@ function feeds_dashboard_show_operation(FeedsImporter $feed_importer, $did) {
   if(!empty($operation)) {
     return theme('feeds_dashboard_history_page', array('operations' => $operation));
   }
+
   return t("No content found for this operation.");
 }
 
@@ -55,6 +57,7 @@ function feeds_dashboard_show_operation_content(FeedsImporter $feed_importer, $d
     }
     return theme('table', array('header' => $header, 'rows' => $rows));
   }
+
   return t("No content found for this import.");
 }
 

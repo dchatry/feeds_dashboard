@@ -40,6 +40,14 @@ function feeds_dashboard_menu() {
     'access arguments' => array('import', 1),
     'file' => 'feeds_dashboard.pages.inc',
   );
+  $items['import/%feeds_importer/init'] = array(
+    'title' => 'Initialize content',
+    'type' => MENU_LOCAL_TASK,
+    'page callback' => 'feeds_dashboard_initialize_content',
+    'page arguments' => array(1),
+    'access callback' => 'feeds_access',
+    'access arguments' => array('import', 1)
+  );
 
   return $items;
 }
@@ -330,6 +338,7 @@ function feeds_dashboard_revert_operation(FeedsImporter $feed_importer, $did, $c
       drupal_goto('import/' . arg(1) . '/history');
     }
   }
+
   return t("No data for this operation.");
 }
 
@@ -388,5 +397,113 @@ function feeds_dashboard_node_revision_revert(&$entity) {
   } else {
     drupal_set_message(t("Couldn't revert, some entities are not nodes."), 'error', FALSE);
   }
+
   return FALSE;
+}
+
+
+/**
+ * Initialize a content type (and its 
+ * GUID) into Feeds.
+ * Useful if you want to update entities 
+ * that have not been imported with Feeds.
+ *
+ * @param FeedsImporter $feed
+ *   Feed configuration.
+ * @param bool $confirm
+ *   Used to display confirmation page, if $confirm is
+ *   TRUE, the revert will be launched.
+ */
+function feeds_dashboard_initialize_content(FeedsImporter $feed_importer, $confirm = '') {
+  // Get config from importer and check for
+  // mapping configuration.
+  $config = $feed_importer->getConfig();
+
+  if (!isset($config['processor']['config']['mappings']) || !empty($config['processor']['config']['mappings'])) {
+    // Look for GUID.
+    $guid = FALSE;
+
+    foreach ($config['processor']['config']['mappings'] as $mapping) {
+      if($mapping['target'] == 'guid') {
+        $guid = $mapping['source'];
+      }
+    }
+
+    if($guid !== FALSE) {
+      // Presentation.
+      $output = t("<p>Launching content initialization can be useful if you need to update entities that were not imported with Feeds. If you click the \"Confirm\" button, the \"feeds_item\" table will be populated with the content from the <strong>%bundle</strong> bundle with the GUID <strong>%guid</strong>.</p><p><strong>Do you want to initialize your content?</strong></p>", array('%bundle' => $feed_importer->processor->config['bundle'], '%guid' => $guid));
+
+      $output .= l(t("Confirm"), current_path() . "/confirm", array('attributes' => array('class' => 'button')));
+
+      if ($confirm === '') {
+        return $output;
+      }
+      if ($confirm === 'confirm') {
+        // Gather info to be inserted in table.
+        $bundle = $feed_importer->processor->config['bundle'];
+        $processor_name = $feed_importer->config['processor']['plugin_key'];
+        $importer_id = $feed_importer->id;
+        $imported = time();
+
+        switch ($processor_name) {
+          case 'FeedsNodeProcessor':
+            $entity_type = 'node';
+            break;
+          case 'FeedsUserProcessor':
+            $entity_type = 'user';
+            break;
+          
+          // TODO: Handle other entity types.
+          default:
+            $entity_type = 'node';
+            break;
+        }
+
+        $query = new EntityFieldQuery;
+
+        $query->entityCondition('entity_type', $entity_type)
+          ->entityCondition('bundle', $bundle);
+
+        // TODO: Handle other entity types.
+        $results = $query->execute();
+        if (isset($results['node'])) {
+          $nodes = node_load_multiple(array_keys($results['node']));
+          $success = 0;
+
+          foreach ($nodes as $nid => $node) {
+            // Get GUID.
+            if(isset($node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'])) {
+              $guid_value = $node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'];
+            } else {
+              $guid_value = '';
+            }
+
+            // Insert content in feeds_item table.
+            db_insert('feeds_item')
+              ->fields(array(
+                'entity_type' => $entity_type,
+                'entity_id' => $nid,
+                'id' => $importer_id,
+                'feed_nid' => 0,
+                'imported' => $imported,
+                'url' => '',
+                'guid' => $guid_value,
+                'hash' => ''
+              ))
+              ->execute();
+            $success++;
+          }
+        }
+
+        drupal_set_message(t("@success entities were successfully initialized.", array('@success' => $success)), 'status', FALSE);
+
+        // Go back to dashboard.
+        drupal_goto('import/' . arg(1));
+      }
+    } else {
+      return t("No GUID found in mappings, please add a GUID.");
+    }
+  }
+
+  return t("No config found for this importer, please make sure that your mapping is properly set up.");
 }
