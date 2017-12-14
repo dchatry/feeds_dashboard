@@ -468,34 +468,45 @@ function feeds_dashboard_initialize_content(FeedsImporter $feed_importer, $confi
         $results = $query->execute();
         if (isset($results['node'])) {
           $nodes = node_load_multiple(array_keys($results['node']));
-          $success = 0;
+          $success = $skipped = 0;
 
           foreach ($nodes as $nid => $node) {
-            // Get GUID.
-            if(isset($node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'])) {
-              $guid_value = $node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'];
-            } else {
-              $guid_value = '';
-            }
+            $already_initialized = db_select('feeds_item', 'f')
+              ->fields('f')
+              ->condition('entity_type', $entity_type)
+              ->condition('entity_id', $nid)
+              ->execute()
+              ->fetchAssoc();
 
-            // Insert content in feeds_item table.
-            db_insert('feeds_item')
-              ->fields(array(
-                'entity_type' => $entity_type,
-                'entity_id' => $nid,
-                'id' => $importer_id,
-                'feed_nid' => 0,
-                'imported' => $imported,
-                'url' => '',
-                'guid' => $guid_value,
-                'hash' => ''
-              ))
-              ->execute();
-            $success++;
+            if(empty($already_initialized)) {
+              // Get GUID.
+              if(isset($node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'])) {
+                $guid_value = $node->{'field_' . $guid}[LANGUAGE_NONE][0]['value'];
+              } else {
+                $guid_value = '';
+              }
+
+              // Insert content in feeds_item table.
+              db_insert('feeds_item')
+                ->fields(array(
+                  'entity_type' => $entity_type,
+                  'entity_id' => $nid,
+                  'id' => $importer_id,
+                  'feed_nid' => 0,
+                  'imported' => $imported,
+                  'url' => '',
+                  'guid' => $guid_value,
+                  'hash' => ''
+                ))
+                ->execute();
+              $success++;
+            } else {
+              $skipped++;
+            }
           }
         }
 
-        drupal_set_message(t("@success entities were successfully initialized.", array('@success' => $success)), 'status', FALSE);
+        drupal_set_message(t("@success entities were successfully initialized, @skipped were skipped because already initialized.", array('@success' => $success, '@skipped' => $skipped)), 'status', FALSE);
 
         // Go back to dashboard.
         drupal_goto('import/' . arg(1));
